@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -209,6 +210,35 @@ async def submit_contact_form(contact: ContactFormCreate):
         logging.error(f"Error submitting contact form: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit contact form")
 
+# Analytics endpoint
+@api_router.post("/analytics")
+async def track_analytics(analytics_data: dict):
+    """Track visitor analytics"""
+    try:
+        analytics_data["createdAt"] = datetime.utcnow()
+        await db.analytics.insert_one(analytics_data)
+        return {"status": "success"}
+    except Exception as e:
+        logging.error(f"Error tracking analytics: {str(e)}")
+        return {"status": "error"}
+
+@api_router.get("/analytics/summary")
+async def get_analytics_summary():
+    """Get analytics summary"""
+    try:
+        total_visits = await db.analytics.count_documents({})
+        recent_visits = await db.analytics.count_documents({
+            "timestamp": {"$gte": datetime.utcnow() - timedelta(days=7)}
+        })
+        return {
+            "total_visits": total_visits,
+            "recent_visits": recent_visits,
+            "timestamp": datetime.utcnow()
+        }
+    except Exception as e:
+        logging.error(f"Error fetching analytics: {str(e)}")
+        return {"total_visits": 0, "recent_visits": 0}
+        
 # Include router
 app.include_router(api_router)
 
